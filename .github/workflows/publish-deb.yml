@@ -41,8 +41,8 @@ jobs:
       run: |
         LATEST_LINUX_INFO=$(cat cursor_downloads_latest_linux.json)
         VERSION=$(echo "$LATEST_LINUX_INFO" | jq -r '. | keys[]')
-        DOWNLOAD_URL=$(echo "$LATEST_LINUX_INFO" | jq -r --arg version "$VERSION" '.$version[0].url')
-        APPIMAGE_FILENAME=$(echo "$LATEST_LINUX_INFO" | jq -r --arg version "$VERSION" '.$version[0].filename')
+        DOWNLOAD_URL=$(echo "$LATEST_LINUX_INFO" | jq -r --arg version "$VERSION" '.[$version][0].url')
+        APPIMAGE_FILENAME=$(echo "$LATEST_LINUX_INFO" | jq -r --arg version "$VERSION" '.[$version][0].filename')
 
         echo "Latest Version: $VERSION"
         echo "Download URL: $DOWNLOAD_URL"
