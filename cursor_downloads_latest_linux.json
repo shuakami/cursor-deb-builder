@@ -1,0 +1,16 @@
+{
+    "0.48": [
+        {
+            "platform": "LINUX",
+            "description": ".APPIMAGE (X64)",
+            "url": "https://downloads.cursor.com/production/61e99179e4080fecf9d8b92c6e2e3e00fbfb53f4/linux/x64/Cursor-0.48.9-x86_64.AppImage",
+            "filename": "Cursor-0.48.9-x86_64.AppImage"
+        },
+        {
+            "platform": "LINUX",
+            "description": ".APPIMAGE (ARM64)",
+            "url": "https://downloads.cursor.com/production/61e99179e4080fecf9d8b92c6e2e3e00fbfb53f4/linux/arm64/Cursor-0.48.9-aarch64.AppImage",
+            "filename": "Cursor-0.48.9-aarch64.AppImage"
+        }
+    ]
+}

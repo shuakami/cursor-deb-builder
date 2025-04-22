@@ -1,0 +1,120 @@
+name: Publish Cursor Linux DEB
+
+on:
+  schedule:
+    # Runs daily at 00:00 UTC
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+    # Allows manual trigger
+
+jobs:
+  build_and_publish:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write # Needed to create releases
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+
+    - name: Set up Node.js (for Playwright)
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install Playwright and dependencies
+      run: |
+        pip install playwright
+        playwright install --with-deps chromium
+
+    - name: Run Python script to get download info
+      run: python main.py
+
+    - name: Read latest Linux download info
+      id: get_info
+      run: |
+        LATEST_LINUX_INFO=$(cat cursor_downloads_latest_linux.json)
+        VERSION=$(echo "$LATEST_LINUX_INFO" | jq -r '. | keys[]')
+        DOWNLOAD_URL=$(echo "$LATEST_LINUX_INFO" | jq -r --arg version "$VERSION" '.$version[0].url')
+        APPIMAGE_FILENAME=$(echo "$LATEST_LINUX_INFO" | jq -r --arg version "$VERSION" '.$version[0].filename')
+
+        echo "Latest Version: $VERSION"
+        echo "Download URL: $DOWNLOAD_URL"
+        echo "AppImage Filename: $APPIMAGE_FILENAME"
+
+        # Set step outputs
+        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+        echo "DOWNLOAD_URL=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
+        echo "APPIMAGE_FILENAME=$APPIMAGE_FILENAME" >> $GITHUB_OUTPUT
+      shell: bash
+
+    - name: Check if Release already exists
+      id: check_release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        RELEASE_TAG=${{ steps.get_info.outputs.VERSION }}
+        if gh release view "$RELEASE_TAG" &> /dev/null; then
+          echo "Release $RELEASE_TAG already exists. Skipping build and publish."
+          echo "SKIP_PUBLISH=true" >> $GITHUB_OUTPUT
+        else
+          echo "Release $RELEASE_TAG does not exist. Proceeding with build and publish."
+          echo "SKIP_PUBLISH=false" >> $GITHUB_OUTPUT
+        fi
+      shell: bash
+
+    - name: Download AppImage
+      if: steps.check_release.outputs.SKIP_PUBLISH == 'false'
+      run: |
+        DOWNLOAD_URL=${{ steps.get_info.outputs.DOWNLOAD_URL }}
+        APPIMAGE_FILENAME=${{ steps.get_info.outputs.APPIMAGE_FILENAME }}
+        curl -L "$DOWNLOAD_URL" -o "$APPIMAGE_FILENAME"
+      shell: bash
+
+    - name: Modify and Run make-deb.sh
+      if: steps.check_release.outputs.SKIP_PUBLISH == 'false'
+      run: |
+        VERSION=${{ steps.get_info.outputs.VERSION }}
+        APPIMAGE_FILENAME=${{ steps.get_info.outputs.APPIMAGE_FILENAME }}
+        DEB_FILENAME="cursor-${VERSION}-amd64.deb" # Assuming ARCH is amd64 from script
+
+        # Make a temporary copy to modify
+        cp make-deb.sh make-deb.sh.tmp
+
+        # Modify APPIMAGE and VERSION variables
+        sed -i "s/^APPIMAGE=\".*\"$/APPIMAGE=\"$APPIMAGE_FILENAME\"/" make-deb.sh.tmp
+        sed -i "s/^VERSION=\".*\"$/VERSION=\"$VERSION\"/" make-deb.sh.tmp
+
+        chmod +x make-deb.sh.tmp
+
+        # Run the script, piping 'N' to the interactive prompt
+        echo "N" | ./make-deb.sh.tmp
+
+        # Clean up temp file
+        rm make-deb.sh.tmp
+
+        # Verify deb file exists
+        if [ ! -f "$DEB_FILENAME" ]; then
+          echo "Error: DEB file $DEB_FILENAME was not created!"
+          exit 1
+        fi
+
+        echo "DEB_FILENAME=$DEB_FILENAME" >> $GITHUB_OUTPUT
+      shell: bash
+      id: build_deb
+
+    - name: Create Github Release and Upload Asset
+      if: steps.check_release.outputs.SKIP_PUBLISH == 'false'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        RELEASE_TAG=${{ steps.get_info.outputs.VERSION }}
+        DEB_FILENAME=${{ steps.build_deb.outputs.DEB_FILENAME }}
+        gh release create "$RELEASE_TAG" "$DEB_FILENAME" --title "$RELEASE_TAG" --notes "Automated build of Cursor Linux DEB package version $RELEASE_TAG"
+      shell: bash 
