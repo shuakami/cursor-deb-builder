@@ -1,12 +1,6 @@
 #!/bin/bash
 set -e
 
-APPIMAGE="Cursor.AppImage"
-APPNAME="cursor"
-VERSION="0.48.9"
-ARCH="amd64"
-MAINTAINER="xiaoyueyoqwq <xiaoyueyoqwq@gmail.com>"
-DESCRIPTION="Cursor: A powerful, lightweight code editor."
 
 DEBROOT="${APPNAME}-deb"
 INSTALL_DIR="/opt/${APPNAME}"

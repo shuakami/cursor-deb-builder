@@ -79,35 +79,30 @@ jobs:
 
     - name: Modify and Run make-deb.sh
       if: steps.check_release.outputs.SKIP_PUBLISH == 'false'
+      id: build_deb
+      env:
+        APPNAME: cursor
+        VERSION: ${{ steps.get_info.outputs.VERSION }}
+        APPIMAGE: ${{ steps.get_info.outputs.APPIMAGE_FILENAME }}
+        ARCH: amd64
+        MAINTAINER: 'xiaoyueyoqwq <xiaoyueyoqwq@gmail.com>'
+        DESCRIPTION: 'Cursor: A powerful, lightweight code editor.'
       run: |
-        VERSION=${{ steps.get_info.outputs.VERSION }}
-        APPIMAGE_FILENAME=${{ steps.get_info.outputs.APPIMAGE_FILENAME }}
-        DEB_FILENAME="cursor-${VERSION}-amd64.deb" # Assuming ARCH is amd64 from script
-
-        # Make a temporary copy to modify
-        cp make-deb.sh make-deb.sh.tmp
-
-        # Modify APPIMAGE and VERSION variables
-        sed -i "s/^APPIMAGE=\".*\"$/APPIMAGE=\"$APPIMAGE_FILENAME\"/" make-deb.sh.tmp
-        sed -i "s/^VERSION=\".*\"$/VERSION=\"$VERSION\"/" make-deb.sh.tmp
-
-        chmod +x make-deb.sh.tmp
+        chmod +x make-deb.sh
 
         # Run the script, piping 'N' to the interactive prompt
-        echo "N" | ./make-deb.sh.tmp
-
-        # Clean up temp file
-        rm make-deb.sh.tmp
+        # Environment variables set above will be used by the script
+        echo "N" | ./make-deb.sh
 
         # Verify deb file exists
-        if [ ! -f "$DEB_FILENAME" ]; then
-          echo "Error: DEB file $DEB_FILENAME was not created!"
+        EXPECTED_DEB_FILENAME="${APPNAME}-${VERSION}-${ARCH}.deb"
+        if [ ! -f "$EXPECTED_DEB_FILENAME" ]; then
+          echo "Error: DEB file $EXPECTED_DEB_FILENAME was not created!"
           exit 1
         fi
 
-        echo "DEB_FILENAME=$DEB_FILENAME" >> $GITHUB_OUTPUT
+        echo "DEB_FILENAME=$EXPECTED_DEB_FILENAME" >> $GITHUB_OUTPUT
       shell: bash
-      id: build_deb
 
     - name: Create Github Release and Upload Asset
       if: steps.check_release.outputs.SKIP_PUBLISH == 'false'
