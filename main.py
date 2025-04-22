@@ -109,16 +109,6 @@ async def get_cursor_downloads_final_reload(url=TARGET_URL):
                 print("-" * 40)
                 print(f"Starting processing section {section_index + 1}/{section_count}")
 
-                # --- !! Reload Page Before Each Section (except the first) !! ---
-                if section_index > 0:
-                    print(f"\n--- Reloading page to isolate state before section {section_index + 1} ---")
-                    if not await load_or_reload_and_wait():
-                        print(f"Error: Failed to reload page, skipping section {section_index+1}")
-                        # Optionally log this failure distinctively
-                        # downloads_data[f"Error_Section_Reload_{section_index+1}"] = [{"error": "Page reload failed"}]
-                        fail_count += await page.locator('main > div > div > section').nth(section_index).locator('div.grid a').count() # Estimate failures
-                        continue # Skip to the next section
-
                 # --- Re-locate elements for the current section after potential reload ---
                 current_section_locator = page.locator('main > div > div > section').nth(section_index)
 
