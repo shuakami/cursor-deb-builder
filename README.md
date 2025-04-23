@@ -14,4 +14,29 @@ This repository automatically builds Debian (`.deb`) packages for the latest Lin
 
 ## Usage
 
-Check the [Releases](https://github.com/shuakami/cursor-deb-builder/releases) page for the latest `.deb` packages. 
+Check the [Releases](https://github.com/shuakami/cursor-deb-builder/releases) page for the latest `.deb` packages.
+
+## Installation
+
+### Via APT (Debian/Ubuntu/Zorin and derivatives)
+
+1.  **Set up the repository:**
+    Run the following command to add the Cloudsmith repository and its GPG key to your system. You might need to install `curl` first (`sudo apt install curl`).
+    ```bash
+    curl -1sLf \
+      'https://dl.cloudsmith.io/QhHWEwzA2fBaF9VC/shuakami/cursor-linux/setup.deb.sh' \
+      | sudo -E bash
+    ```
+
+2.  **Install Cursor:**
+    After setting up the repository, update your package list and install Cursor:
+    ```bash
+    sudo apt-get update
+    sudo apt-get install cursor
+    ```
+    This will install the latest available version.
+
+    *(Optional) Install a specific version (e.g., 0.48):*
+    ```bash
+    # sudo apt-get install cursor=0.48
+    ``` 
