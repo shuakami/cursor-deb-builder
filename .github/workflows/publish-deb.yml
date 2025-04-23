@@ -116,7 +116,7 @@ jobs:
 
     - name: Push DEB to Cloudsmith
       if: steps.check_release.outputs.SKIP_PUBLISH == 'false'
-      uses: cloudsmith-io/action@v2.0.0
+      uses: cloudsmith-io/action@v0.6.14
       with:
         api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
         command: "push"
