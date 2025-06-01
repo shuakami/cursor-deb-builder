@@ -147,6 +147,7 @@ async def get_cursor_downloads_final_reload(url=TARGET_URL):
                     print(f"Found {link_count} download links in version {current_version}.")
 
                     # --- Process Links Serially within the section ---
+                    processed_links_for_section = [] # Store successfully processed links for this section
                     for link_index in range(link_count):
                         current_link_locator = link_locator_list.nth(link_index)
                         link_start_time = time.time()
@@ -236,6 +237,12 @@ async def get_cursor_downloads_final_reload(url=TARGET_URL):
                         # --- End of Retry Loop ---
 
                         if not error_occurred_final:
+                             processed_links_for_section.append({ # Add to temporary list first
+                                 "platform": platform_text,
+                                 "description": description_text,
+                                 "url": download_url,
+                                 "filename": filename
+                             })
                              if current_version not in downloads_data:
                                  downloads_data[current_version] = []
                              downloads_data[current_version].append({
@@ -248,10 +255,38 @@ async def get_cursor_downloads_final_reload(url=TARGET_URL):
                              # Only increment final fail count after all retries
                              if attempt >= RETRY_COUNT:
                                  fail_count += 1
+                    
+                    # --- After processing all links in a section, try to recover version from URLs if title fetch failed ---
+                    if current_version.startswith("Unknown_Version_") or current_version.startswith("Failed_Title_Fetch_"):
+                        recovered_version_from_url = None
+                        for link_info in processed_links_for_section:
+                            # More specific regex for versions like 0.50.5 or 0.50.5-nightly.20240101
+                            # It looks for at least two digits.digits, optionally followed by more .digits or -alphanumeric.alphanumeric
+                            match_url_version = re.search(r'(\d+\.\d+(\.\d+)*(-[a-zA-Z0-9.]+)*)', link_info.get("filename", ""))
+                            if match_url_version:
+                                potential_version = match_url_version.group(1)
+                                # Basic sanity check for a plausible version number (e.g., not just "10" or "2")
+                                if potential_version.count('.') >= 1 and len(potential_version) > 2:
+                                    recovered_version_from_url = potential_version
+                                    print(f"    -> Recovered version '{recovered_version_from_url}' from filename: {link_info.get('filename')}")
+                                    break # Found a version, use it
+                        
+                        if recovered_version_from_url:
+                            # If a version was recovered, and it's different from the placeholder
+                            if current_version in downloads_data:
+                                # Move the links from the placeholder key to the new recovered version key
+                                if recovered_version_from_url not in downloads_data:
+                                    downloads_data[recovered_version_from_url] = []
+                                downloads_data[recovered_version_from_url].extend(downloads_data[current_version])
+                                print(f"    -> Migrated {len(downloads_data[current_version])} links from '{current_version}' to '{recovered_version_from_url}'.")
+                                del downloads_data[current_version]
+                            current_version = recovered_version_from_url # Update current_version for subsequent logic if any
+                        else:
+                            print(f"    -> Failed to recover version from URLs for section originally named '{current_version}'.")
 
-                        link_duration = time.time() - link_start_time
-                        print(f"    Time taken: {link_duration:.2f} sec {'(Failed after retries)' if error_occurred_final else ''}")
-                        await page.wait_for_timeout(150) # Slightly longer pause
+                    link_duration = time.time() - link_start_time
+                    print(f"    Time taken: {link_duration:.2f} sec {'(Failed after retries)' if error_occurred_final else ''}")
+                    await page.wait_for_timeout(150)
 
                 except Exception as section_process_err:
                     print(f"Error processing links within section {section_index+1}: {section_process_err}")
@@ -309,6 +344,23 @@ async def get_cursor_downloads_final_reload(url=TARGET_URL):
                 else:
                     print(f"No successful Linux downloads found for the latest version ({latest_version_key}).")
 
+                if latest_version_key.startswith("Unknown_Version_") or latest_version_key.startswith("Failed_Title_Fetch_"):
+                    error_message = f"Critical Error: Determined latest_version_key ('{latest_version_key}') is invalid after all processing. Aborting to prevent incorrect artifact naming."
+                    print(error_message)
+                    # Write the full data to help debug why version resolution failed
+                    full_data_path = "cursor_downloads_all_ERROR.json"
+                    try:
+                        with open(full_data_path, 'w', encoding='utf-8') as f:
+                            json.dump(downloads_data, f, ensure_ascii=False, indent=4)
+                        print(f"Full download data (with error) written to {full_data_path}")
+                    except Exception as e_write:
+                        print(f"Additionally, failed to write error data dump: {e_write}")
+                    
+                    # Optionally, close browser if it hasn't been closed yet in an error path
+                    if browser and browser.is_connected():
+                        await browser.close()
+                        print("Browser closed due to critical version error.")
+                    sys.exit(1) # Exit with error code to fail the GitHub Action step
 
             return downloads_data, None
 
